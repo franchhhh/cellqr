@@ -1,14 +1,6 @@
-CELL QR — приложение для iPhone (PWA)
-
-СОДЕРЖИМОЕ: index.html, qr-engine.js, manifest.webmanifest, sw.js, значки.
-
-ПУБЛИКАЦИЯ С IPHONE (через GitHub):
-1. Создайте репозиторий на github.com, например cellqr.
-2. В интерфейсе репозитория используйте Add file → Upload files. Загрузите ВСЕ файлы из этой папки В КОРЕНЬ репозитория (не сам ZIP).
-3. Settings → Pages → Deploy from a branch → main / (root) → Save.
-4. Откройте появившийся адрес https://USERNAME.github.io/cellqr/ в Safari.
-5. Поделиться → На экран «Домой» → Добавить.
-
-ВАЖНО: без публикации на HTTPS iOS не сможет установить PWA и кешировать офлайн. На сервере нужно отдавать файлы по HTTPS.
-
-QR содержит точно набранную строку, например ANO-CON199, K09-12B5, K10-11A5.
+CELL QR TEAM V3 — совместимо с таблицами cells, cell_history, cell_admins и функциями claim_cell/add_cell/release_cell.
+Разместите файлы в корне GitHub Pages (без ZIP).
+Внутри CELL QR во вкладке Загрузка введите Project URL и Publishable key (НЕ service_role). Войдите через email и пароль Supabase Authentication.
+Создайте отдельный аккаунт для каждого сотрудника через Authentication → Users. Администратор должен быть добавлен в cell_admins.
+Поддерживается повторное освобождение с подтверждением. Данные в Supabase. Обновление списка каждые 5 секунд на открытой вкладке.
+ВАЖНО: действующая SQL-схема позволяет всем авторизованным читать все ячейки и историю; для одной команды это ожидаемое поведение. Не делитесь аккаунтами сотрудников.
