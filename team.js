@@ -1,7 +1,7 @@
 (()=>{'use strict';
 const $=s=>document.querySelector(s);let cells=[],selected=null,preview=[],busy=false;
 const conf=window.CELLQR_CONFIG||{};
-function notice(t){$('#connectState').textContent=t;$('#authStatus').textContent=t}
+function notice(t){$('#connectState').textContent=t;}
 function normalize(s){let x=String(s||'').trim().toUpperCase().replace(/К/g,'K').replace(/А/g,'A').replace(/В/g,'B').replace(/С/g,'C').replace(/\s+/g,'');if(/^\d{1,6}$/.test(x))return 'ANO-CON'+x;if(/^ANO-CON\d{1,6}$/.test(x))return x;if(/^K(?:09|10)-\d{1,3}[ABC]\d{1,3}$/.test(x))return x;return null}
 function configured(){return /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(conf.url||'') && /^(sb_publishable_|eyJ)/.test(conf.key||'')}
 async function api(path,options={}){if(!configured())throw Error('Владелец ещё не настроил публичный ключ в config.js');let r=await fetch(conf.url+path,{...options,headers:{apikey:conf.key,'Content-Type':'application/json',...(options.headers||{})}});if(!r.ok){let t=await r.text();throw Error('Ошибка '+r.status+': '+t.slice(0,200))}let t=await r.text();return t?JSON.parse(t):null}
@@ -9,12 +9,25 @@ const rpc=(n,args)=>api('/rest/v1/rpc/'+n,{method:'POST',body:JSON.stringify(arg
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('current',x===b));document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('visible',x.id===b.dataset.tab));if(b.dataset.tab==='list')refresh()});
 function draw(){let free=cells.filter(c=>c.status==='free');$('#counter').textContent='Свободных ячеек: '+free.length;let box=$('#listItems');box.replaceChildren();for(let c of free){let row=document.createElement('div');row.className='item';let name=document.createElement('strong');name.textContent=c.code;let b=document.createElement('button');b.textContent='QR';b.onclick=()=>show(c.code);row.append(name,b);box.append(row)}if(!free.length)box.textContent='Свободных ячеек пока нет'}
 async function refresh(){if(busy)return;busy=true;try{cells=await api('/rest/v1/cells?select=code,status&status=eq.free&order=code.asc');draw();notice('Обновлено в '+new Date().toLocaleTimeString('ru-RU'))}catch(e){notice(e.message)}finally{busy=false}}
-$('#refresh').onclick=refresh;setInterval(()=>{if(document.visibilityState==='visible' && $('#list').classList.contains('visible'))refresh()},5000);
+$('#refresh').onclick=refresh;
+$('#clearAllFree').onclick=async()=>{
+  await refresh();
+  const count=cells.filter(c=>c.status==='free').length;
+  if(!count){alert('Список свободных ячеек уже пуст.');return}
+  const answer=prompt('ВНИМАНИЕ! Будут убраны ВСЕ '+count+' свободных ячеек для всех сотрудников.\n\nЧтобы подтвердить, введи слово УДАЛИТЬ:');
+  if(answer!== 'УДАЛИТЬ'){if(answer!==null)alert('Очистка отменена: подтверждение не совпало.');return}
+  const b=$('#clearAllFree');b.disabled=true;
+  try{
+    const n=await rpc('clear_free_cells',{});
+    alert('Свободные ячейки удалены из списка: '+n+'. История сохранена.');
+    await refresh();
+  }catch(e){alert('Не удалось очистить список: '+e.message)}finally{b.disabled=false}
+};setInterval(()=>{if(document.visibilityState==='visible' && $('#list').classList.contains('visible'))refresh()},5000);
 function svg(txt){let q=new window.CellQRCode(0,0);q.addData(txt);q.make();let n=q.getModuleCount(),z=n+8,a=['<svg viewBox="0 0 '+z+' '+z+'" shape-rendering="crispEdges"><rect width="'+z+'" height="'+z+'" fill="white"/>'];for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(q.isDark(y,x))a.push('<rect x="'+(x+4)+'" y="'+(y+4)+'" width="1" height="1" fill="black"/>');return a.join('')+'</svg>'}
 function show(code){selected=code;$('#teamName').textContent=code;$('#teamQR').innerHTML=svg(code);$('#teamFeedback').textContent='';$('#teamOverlay').classList.add('visible')}
 $('#teamClose').onclick=()=>$('#teamOverlay').classList.remove('visible');
 $('#claim').onclick=async()=>{if(!selected)return;$('#claim').disabled=true;try{let ok=await rpc('claim_cell',{p_code:selected});$('#teamOverlay').classList.remove('visible');await refresh();if(!ok)alert('Эту ячейку уже занял другой сотрудник')}catch(e){alert(e.message)}finally{$('#claim').disabled=false}};
 $('#recognize').onclick=()=>{preview=[...new Set($('#paste').value.split(/\r?\n/).map(normalize).filter(Boolean))];let box=$('#preview');box.replaceChildren();$('#upload').classList.toggle('hidden',!preview.length);if(!preview.length){box.textContent='Не найдено ячеек. Пиши по одной на строку.';return}let label=document.createElement('div');label.textContent='Распознано '+preview.length+'. Проверь:';box.append(label);for(let code of preview){let row=document.createElement('label');row.className='item';let cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.dataset.code=code;row.append(cb,document.createTextNode(' '+code));box.append(row)}};
-$('#upload').onclick=async()=>{let picked=Array.from($('#preview').querySelectorAll('input:checked')).map(c=>c.dataset.code);if(!picked.length)return;$('#upload').disabled=true;let added=0,already=0,occupied=[],failed=[];try{for(let code of picked){try{let outcome=await rpc('import_cell',{p_code:code});if(outcome==='added')added++;else if(outcome==='free')already++;else if(outcome==='occupied')occupied.push(code);else failed.push(code+': неизвестный ответ')}catch(e){failed.push(code+': '+e.message);break}}alert('Добавлено: '+added+'; уже свободны: '+already+(failed.length?'\nОшибки: '+failed.join('; '):''));if(occupied.length){let ok=confirm('РАНЕЕ ЗАНЯТЫЕ:\n'+occupied.join(', ')+'\n\nПодтверждаешь, что это НОВЫЕ сообщения об освобождении, а не старая переписка?');if(ok){let cnt=0;for(let code of occupied)if(await rpc('release_cell',{p_code:code}))cnt++;alert('Повторно освобождено: '+cnt)}}await refresh()}catch(e){alert(e.message)}finally{$('#upload').disabled=false}};
+$('#upload').onclick=async()=>{let picked=Array.from($('#preview').querySelectorAll('input:checked')).map(c=>c.dataset.code);if(!picked.length)return;$('#upload').disabled=true;let added=0,already=0,occupied=[],failed=[];try{for(let code of picked){try{let outcome=await rpc('import_cell',{p_code:code});if(outcome==='added')added++;else if(outcome==='free')already++;else if(outcome==='occupied'||outcome==='cleared')occupied.push(code);else failed.push(code+': неизвестный ответ')}catch(e){failed.push(code+': '+e.message);break}}alert('Добавлено: '+added+'; уже свободны: '+already+(failed.length?'\nОшибки: '+failed.join('; '):''));if(occupied.length){let ok=confirm('РАНЕЕ ЗАНЯТЫЕ:\n'+occupied.join(', ')+'\n\nПодтверждаешь, что это НОВЫЕ сообщения об освобождении, а не старая переписка?');if(ok){let cnt=0;for(let code of occupied)if(await rpc('release_cell',{p_code:code}))cnt++;alert('Повторно освобождено: '+cnt)}}await refresh()}catch(e){alert(e.message)}finally{$('#upload').disabled=false}};
 if(configured())refresh();else notice('Нужно один раз настроить config.js на GitHub');
 })();
