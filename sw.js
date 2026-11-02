@@ -1,5 +1,5 @@
-const CACHE='cellqr-team-v8';
-const ASSETS=['./','./index.html','./qr-engine.js','./team.js?v=8','./config.js?v=7','./walk.js?v=8','./walk.css?v=8'];
+const CACHE='cellqr-team-v9';
+const ASSETS=['./','./index.html','./qr-engine.js','./team.js?v=9','./config.js?v=7','./walk.js?v=9','./walk.css?v=9'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(async c=>{await c.addAll(ASSETS);await Promise.allSettled(['./manifest.webmanifest','./icon-180.png','./icon-192.png','./icon-512.png'].map(u=>c.add(u)));}).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('cellqr-team-')&&k!==CACHE).map(k=>caches.delete(k))))])));
 self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.origin!==self.location.origin)return;e.respondWith(fetch(e.request).then(r=>{if(r.ok){const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));}return r;}).catch(async()=>{const hit=await caches.match(e.request);if(hit)return hit;if(e.request.mode==='navigate')return caches.match('./index.html');return Response.error();}));});
